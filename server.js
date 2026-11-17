@@ -28,7 +28,7 @@ app.post('/send', sendLimiter, async (req, res) => {
     // Honeypot: bots often fill this hidden field. Do not forward it.
     if (website) return res.json({ ok: true, message: 'پیام دریافت شد.' });
 
-    const allowedAdmins = ['عرفان', 'سجاد', 'حاجی', 'ریحانه', 'مارال', 'معین', 'علی', 'امیر', 'خلخالی'];
+    const allowedAdmins = ['عرفان', 'سجاد', 'حاجی', 'رقیه', 'مارال', 'معین', 'علی', 'امیر', 'خلخالی'];
     if (!allowedAdmins.includes(admin)) {
       return res.status(400).json({ ok: false, message: 'ادمین انتخاب‌شده معتبر نیست.' });
     }
