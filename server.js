@@ -89,7 +89,7 @@ app.post('/send', sendLimiter, async (req, res) => {
     if (website) return res.json({ ok: true, message: 'پیام دریافت شد.' });
 
     const allowedAdmins = [
-      'عرفان', 'سجاد', 'حاجی', 'ریحانه',
+      '  عرفان', 'سجاد', 'حاجی',' رقیه'
       'مارال', 'معین', 'علی', 'امیر', 'خلخالی'
     ];
 
