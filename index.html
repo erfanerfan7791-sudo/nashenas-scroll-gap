@@ -21,7 +21,7 @@ border:1px solid #4b2024;border-radius:24px;padding:26px;
 box-shadow:0 18px 60px #0009,0 0 30px #b21e2b18
 }
 .logo{text-align:center;margin-bottom:24px}
-.logo .mark{
+.mark{
 display:inline-grid;place-items:center;width:58px;height:58px;
 border-radius:18px;background:linear-gradient(145deg,#f04452,#8d101b);
 font-size:28px;font-weight:bold;box-shadow:0 8px 28px #e21d303d
@@ -67,7 +67,7 @@ background:linear-gradient(100deg,#ed3948,#a91623);
 color:white;font-size:15px;font-weight:bold;cursor:pointer
 }
 button:disabled{opacity:.6;cursor:wait}
-.status{display:none;margin-top:14px;padding:12px;border-radius:12px;font-size:13px;line-height:1.8}
+.status{display:none;margin-top:14px;padding:12px;border-radius:12px;font-size:13px;line-height:1.8;overflow-wrap:anywhere}
 .status.show{display:block}
 .status.ok{background:#123322;color:#a7f3c4}
 .status.err{background:#42191d;color:#ffb5bc}
@@ -104,13 +104,7 @@ button:disabled{opacity:.6;cursor:wait}
 </div>
 
 <label for="message">پیام ناشناس تو</label>
-
-<textarea
-id="message"
-name="message"
-maxlength="2000"
-placeholder="پیامت رو اینجا بنویس..."
-></textarea>
+<textarea id="message" name="message" maxlength="2000" placeholder="پیامت رو اینجا بنویس..."></textarea>
 
 <div class="hint">
 می‌تونی فقط فایل بفرستی یا متن و فایل رو با هم ارسال کنی.
@@ -118,27 +112,20 @@ placeholder="پیامت رو اینجا بنویس..."
 
 <div class="file-box">
 <label class="file-label" for="file">📎 انتخاب فایل</label>
-<input
-class="file-input"
-type="file"
-id="file"
-name="file"
-accept="image/*,video/*,audio/*,.pdf"
->
+<input class="file-input" type="file" id="file" name="file"
+accept="image/*,video/*,audio/*,.pdf">
 <div id="fileName" class="file-name">هنوز فایلی انتخاب نکردی</div>
 <div class="hint">عکس، ویدیو، صوت یا PDF · حداکثر ۱۰ مگابایت</div>
 </div>
 
-<input class="hp" type="text" name="website" id="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+<input class="hp" type="text" name="website" tabindex="-1" autocomplete="off">
 
 <button id="submit" type="submit">ارسال پیام ناشناس</button>
-
 <div id="status" class="status" role="status" aria-live="polite"></div>
 
 </form>
 
 <footer class="foot">NASHENAS SCROLL GAP · پیام ناشناس</footer>
-
 </main>
 
 <script>
@@ -149,81 +136,109 @@ const fileInput = document.getElementById('file');
 const fileName = document.getElementById('fileName');
 const messageInput = document.getElementById('message');
 
-fileInput.addEventListener('change', () => {
+let sending = false;
+
+function show(text,type){
+statusBox.textContent = text;
+statusBox.className = 'status show ' + type;
+}
+
+fileInput.addEventListener('change',()=>{
 const file = fileInput.files[0];
 
-if (!file) {
+if(!file){
 fileName.textContent = 'هنوز فایلی انتخاب نکردی';
 return;
 }
 
-if (file.size > 10 * 1024 * 1024) {
+if(file.size > 10*1024*1024){
 fileInput.value = '';
 fileName.textContent = 'هنوز فایلی انتخاب نکردی';
-show('حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.', 'err');
+show('حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.','err');
 return;
 }
 
 fileName.textContent =
-'📎 ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' مگابایت)';
+'📎 '+file.name+' ('+(file.size/1024/1024).toFixed(2)+' مگابایت)';
+statusBox.className = 'status';
 });
 
-form.addEventListener('submit', async e => {
+form.addEventListener('submit',async(e)=>{
 e.preventDefault();
+
+if(sending)return;
 
 const adminInput = form.querySelector('input[name="admin"]:checked');
 const message = messageInput.value.trim();
 const file = fileInput.files[0];
 
-if (!adminInput) {
-show('اول یک ادمین انتخاب کن.', 'err');
+if(!adminInput){
+show('اول یک ادمین انتخاب کن.','err');
 return;
 }
 
-if (message.length < 2 && !file) {
-show('متن پیام یا یک فایل انتخاب کن.', 'err');
+if(message.length < 2 && !file){
+show('متن پیام یا یک فایل انتخاب کن.','err');
 return;
 }
 
-if (file && file.size > 10 * 1024 * 1024) {
-show('حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.', 'err');
+if(file && file.size > 10*1024*1024){
+show('حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.','err');
 return;
 }
 
-const formData = new FormData(form);
-
+sending = true;
 btn.disabled = true;
 btn.textContent = 'در حال ارسال...';
 statusBox.className = 'status';
 
-try {
-const response = await fetch('/send', {
-method: 'POST',
-body: formData
+const formData = new FormData(form);
+
+try{
+const controller = new AbortController();
+const timeout = setTimeout(()=>controller.abort(),90000);
+
+let response;
+
+try{
+response = await fetch('/send',{
+method:'POST',
+body:formData,
+signal:controller.signal
 });
-
-const data = await response.json();
-
-if (!response.ok || !data.ok) {
-throw new Error(data.message || 'ارسال انجام نشد.');
+}finally{
+clearTimeout(timeout);
 }
 
-show(data.message, 'ok');
+const raw = await response.text();
+let data;
+
+try{
+data = JSON.parse(raw);
+}catch{
+throw new Error('پاسخ سرور معتبر نیست. کد وضعیت: '+response.status);
+}
+
+if(!response.ok || !data.ok){
+throw new Error(data.message || 'ارسال انجام نشد. کد: '+response.status);
+}
+
+show(data.message || 'پیام با موفقیت ارسال شد ❤️','ok');
 form.reset();
 fileName.textContent = 'هنوز فایلی انتخاب نکردی';
 
-} catch (err) {
-show(err.message || 'ارتباط با سرور برقرار نشد.', 'err');
-} finally {
+}catch(err){
+if(err.name === 'AbortError'){
+show('زمان ارسال تمام شد. ممکن است فایل بزرگ باشد یا سرور پاسخ نداده باشد.','err');
+}else{
+show(err.message || 'ارتباط با سرور برقرار نشد.','err');
+}
+}finally{
+sending = false;
 btn.disabled = false;
 btn.textContent = 'ارسال پیام ناشناس';
 }
 });
-
-function show(text, type) {
-statusBox.textContent = text;
-statusBox.className = 'status show ' + type;
-}
 </script>
 
 </body>
