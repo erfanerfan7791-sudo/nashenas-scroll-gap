@@ -1,6 +1,7 @@
 
 const express = require('express');
 const helmet = require('helmet');
+const multer = require('multer');
 const { rateLimit } = require('express-rate-limit');
 
 const app = express();
@@ -24,6 +25,27 @@ const channels = {
   'خلخالی': '11302069'
 };
 
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+    files: 1
+  },
+  fileFilter: (_req, file, callback) => {
+    const allowed =
+      file.mimetype.startsWith('image/') ||
+      file.mimetype.startsWith('video/') ||
+      file.mimetype.startsWith('audio/') ||
+      file.mimetype === 'application/pdf';
+
+    if (!allowed) {
+      return callback(new Error('فقط عکس، ویدیو، صوت و PDF مجاز است.'));
+    }
+
+    callback(null, true);
+  }
+});
+
 const sendLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   limit: 5,
@@ -39,9 +61,13 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/send', sendLimiter, async (req, res) => {
+app.post('/send', sendLimiter, upload.single('file'), async (req, res) => {
   try {
-    const { admin, message, website } = req.body || {};
+    const admin = req.body.admin;
+    const message = typeof req.body.message === 'string'
+      ? req.body.message.trim()
+      : '';
+    const website = req.body.website;
 
     if (website) {
       return res.json({ ok: true, message: 'پیام دریافت شد.' });
@@ -54,43 +80,69 @@ app.post('/send', sendLimiter, async (req, res) => {
       });
     }
 
-    if (
-      typeof message !== 'string' ||
-      message.trim().length < 2 ||
-      message.trim().length > 2000
-    ) {
+    if (message.length > 2000) {
       return res.status(400).json({
         ok: false,
-        message: 'پیام باید بین ۲ تا ۲۰۰۰ نویسه باشد.'
+        message: 'متن پیام نباید بیشتر از ۲۰۰۰ نویسه باشد.'
+      });
+    }
+
+    if (!message && !req.file) {
+      return res.status(400).json({
+        ok: false,
+        message: 'متن پیام یا یک فایل انتخاب کن.'
       });
     }
 
     if (!TOKEN) {
       return res.status(503).json({
         ok: false,
-        message: 'اتصال ایتا تنظیم نشده است.'
+        message: 'اتصال ایتایار تنظیم نشده است.'
       });
     }
 
-    const text =
-  `📩 پیام ناشناس جدید\n` +
-  `👤 گیرنده: ${admin}\n\n` +
-  `${message.trim()}\n\n` +
-  `#ناشناس_${admin}`;
+    const caption =
+      `📩 پیام ناشناس جدید\n` +
+      `👤 گیرنده: ${admin}\n\n` +
+      `${message ? message + '\n\n' : ''}` +
+      `#ناشناس-${admin}`;
 
-    const apiResponse = await fetch(
-      `https://eitaayar.ir/api/${TOKEN}/sendMessage`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({
-          chat_id: channels[admin],
-          text
-        })
-      }
-    );
+    const chatId = channels[admin];
+    let apiResponse;
+
+    if (req.file) {
+      const formData = new FormData();
+
+      formData.append('chat_id', chatId);
+      formData.append('caption', caption);
+      formData.append(
+        'file',
+        new Blob([req.file.buffer], { type: req.file.mimetype }),
+        req.file.originalname
+      );
+
+      apiResponse = await fetch(
+        `https://eitaayar.ir/api/${TOKEN}/sendFile`,
+        {
+          method: 'POST',
+          body: formData
+        }
+      );
+    } else {
+      apiResponse = await fetch(
+        `https://eitaayar.ir/api/${TOKEN}/sendMessage`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            chat_id: chatId,
+            text: caption
+          })
+        }
+      );
+    }
 
     const result = await apiResponse.json().catch(() => ({}));
 
@@ -99,13 +151,15 @@ app.post('/send', sendLimiter, async (req, res) => {
 
       return res.status(502).json({
         ok: false,
-        message: 'ارسال پیام انجام نشد. دسترسی ربات به کانال را بررسی کن.'
+        message: 'ارسال انجام نشد. دسترسی ربات و تنظیمات ایتا را بررسی کن.'
       });
     }
 
     return res.json({
       ok: true,
-      message: `پیامت با موفقیت برای ${admin} ارسال شد ❤️`
+      message: req.file
+        ? `فایل و پیام با موفقیت برای ${admin} ارسال شدند ❤️`
+        : `پیامت با موفقیت برای ${admin} ارسال شد ❤️`
     });
 
   } catch (err) {
@@ -116,6 +170,20 @@ app.post('/send', sendLimiter, async (req, res) => {
       message: 'خطای موقت سرور. دوباره تلاش کن.'
     });
   }
+});
+
+app.use((err, _req, res, _next) => {
+  if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({
+      ok: false,
+      message: 'حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.'
+    });
+  }
+
+  return res.status(400).json({
+    ok: false,
+    message: err.message || 'فایل قابل قبول نیست.'
+  });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
