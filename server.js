@@ -73,10 +73,10 @@ app.post('/send', sendLimiter, async (req, res) => {
     }
 
     const text =
-      `📩 پیام ناشناس جدید\n` +
-      `👤 گیرنده: ${admin}\n\n` +
-      `${message.trim()}\n\n` +
-      `— ناشناس اسکرول گپ`;
+  `📩 پیام ناشناس جدید\n` +
+  `👤 گیرنده: ${admin}\n\n` +
+  `${message.trim()}\n\n` +
+  `#ناشناس-${admin}`;
 
     const apiResponse = await fetch(
       `https://eitaayar.ir/api/${TOKEN}/sendMessage`,
