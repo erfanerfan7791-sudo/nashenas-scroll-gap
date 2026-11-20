@@ -105,7 +105,7 @@ app.post('/send', sendLimiter, upload.single('file'), async (req, res) => {
       `📩 پیام ناشناس جدید\n` +
       `👤 گیرنده: ${admin}\n\n` +
       `${message ? message + '\n\n' : ''}` +
-      `#ناشناس-${admin}`;
+      `#ناشناس_${admin}`;
 
     const chatId = channels[admin];
     let apiResponse;
