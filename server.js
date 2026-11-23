@@ -94,7 +94,7 @@ app.post('/send', sendLimiter, upload.single('file'), async (req, res) => {
       `📩 پیام ناشناس جدید\n` +
       `👤 گیرنده: ${admin}\n\n` +
       `${message ? message + '\n\n' : ''}` +
-      `#ناشناس-${admin}`;
+      `#ناشناس_${admin}`;
 
     const url = `https://eitaayar.ir/api/${TOKEN}/${req.file ? 'sendFile' : 'sendMessage'}`;
     let apiResponse;
