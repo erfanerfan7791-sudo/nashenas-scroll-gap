@@ -1,9 +1,8 @@
-
 {
   "name": "nashenas-scroll-gap",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Anonymous message box for Scroll Gap",
+  "description": "Anonymous message and file submission website for EitaaYar",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -14,7 +13,7 @@
   "dependencies": {
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
-    "helmet": "^8.0.0",
+    "helmet": "^8.1.0",
     "multer": "^2.0.2"
   }
 }
