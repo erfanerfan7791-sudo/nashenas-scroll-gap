@@ -6,6 +6,7 @@ const { rateLimit } = require('express-rate-limit');
 const { randomUUID } = require('node:crypto');
 const axios = require('axios');
 const FormData = require('form-data');
+const path = require('node:path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,14 +35,25 @@ const upload = multer({
     files: 1
   },
   fileFilter: (_req, file, cb) => {
-    const allowed =
-      file.mimetype.startsWith('image/') ||
-      file.mimetype.startsWith('video/') ||
-      file.mimetype.startsWith('audio/') ||
-      file.mimetype === 'application/pdf';
+    const allowedTypes = [
+      /^image\//,
+      /^video\//,
+      /^audio\//,
+      /^text\//,
+      /^application\/pdf$/,
+      /^application\/zip$/,
+      /^application\/x-zip-compressed$/,
+      /^application\/msword$/,
+      /^application\/vnd\./,
+      /^application\/octet-stream$/
+    ];
+
+    const allowed = allowedTypes.some(type =>
+      type.test(file.mimetype)
+    );
 
     if (!allowed) {
-      return cb(new Error('فقط عکس، ویدیو، صوت و PDF مجاز است.'));
+      return cb(new Error('نوع این فایل مجاز نیست.'));
     }
 
     cb(null, true);
@@ -65,21 +77,27 @@ app.get('/health', (_req, res) => {
 
 app.use('/send', (req, _res, next) => {
   req.requestId = randomUUID().slice(0, 8);
-  console.log(`[${req.requestId}] درخواست جدید دریافت شد`);
+  console.log(`[${req.requestId}] درخواست جدید`);
   next();
 });
+
+function getFileLength(form) {
+  return new Promise((resolve, reject) => {
+    form.getLength((error, length) => {
+      if (error) reject(error);
+      else resolve(length);
+    });
+  });
+}
 
 app.post('/send', sendLimiter, (req, res) => {
   const id = req.requestId;
 
   upload.single('file')(req, res, async (uploadError) => {
     if (uploadError) {
-      console.error(`[${id}] خطای دریافت فایل:`, uploadError.message);
+      console.error(`[${id}] خطای آپلود:`, uploadError.message);
 
-      if (
-        uploadError instanceof multer.MulterError &&
-        uploadError.code === 'LIMIT_FILE_SIZE'
-      ) {
+      if (uploadError.code === 'LIMIT_FILE_SIZE') {
         return res.status(413).json({
           ok: false,
           message: 'حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.'
@@ -93,28 +111,22 @@ app.post('/send', sendLimiter, (req, res) => {
     }
 
     try {
-      console.log(`[${id}] اطلاعات فرم دریافت شد`);
-
       const admin = req.body?.admin;
       const message = typeof req.body?.message === 'string'
         ? req.body.message.trim()
         : '';
 
       if (req.body?.website) {
-        return res.json({ ok: true, message: 'پیام دریافت شد.' });
+        return res.json({
+          ok: true,
+          message: 'پیام دریافت شد.'
+        });
       }
 
       if (!Object.prototype.hasOwnProperty.call(channels, admin)) {
         return res.status(400).json({
           ok: false,
           message: 'گیرنده انتخاب‌شده معتبر نیست.'
-        });
-      }
-
-      if (!message && !req.file) {
-        return res.status(400).json({
-          ok: false,
-          message: 'متن پیام یا فایل انتخاب کن.'
         });
       }
 
@@ -125,12 +137,19 @@ app.post('/send', sendLimiter, (req, res) => {
         });
       }
 
+      if (!message && !req.file) {
+        return res.status(400).json({
+          ok: false,
+          message: 'متن پیام یا فایل انتخاب کن.'
+        });
+      }
+
       if (!TOKEN) {
-        console.error(`[${id}] EITAAYAR_TOKEN تنظیم نشده است`);
+        console.error(`[${id}] توکن ایتایار تنظیم نشده است`);
 
         return res.status(503).json({
           ok: false,
-          message: 'اتصال ایتایار تنظیم نشده است.'
+          message: 'توکن ایتایار روی سرور تنظیم نشده است.'
         });
       }
 
@@ -140,16 +159,18 @@ app.post('/send', sendLimiter, (req, res) => {
         `${message ? message + '\n\n' : ''}` +
         `#ناشناس_${admin}`;
 
-      const method = req.file ? 'sendFile' : 'sendMessage';
-      const url = `https://eitaayar.ir/api/${TOKEN}/${method}`;
-
-      console.log(`[${id}] شروع ارسال با Axios: ${method}`);
+      const baseUrl = `https://eitaayar.ir/api/${TOKEN}`;
 
       let response;
 
       if (req.file) {
+        const safeName = path.basename(
+          req.file.originalname || 'file.bin'
+        ).replace(/[\r\n"]/g, '_');
+
         console.log(
-          `[${id}] فایل: ${req.file.originalname} - ${req.file.size} bytes`
+          `[${id}] فایل دریافت شد: ${safeName}, ` +
+          `${req.file.mimetype}, ${req.file.size} bytes`
         );
 
         const form = new FormData();
@@ -157,42 +178,58 @@ app.post('/send', sendLimiter, (req, res) => {
         form.append('chat_id', channels[admin]);
         form.append('caption', caption);
 
-        form.append(
-          'file',
-          req.file.buffer,
+        // نام فیلد فایل در API ایتایار
+        form.append('file', req.file.buffer, {
+          filename: safeName,
+          contentType: req.file.mimetype,
+          knownLength: req.file.size
+        });
+
+        const contentLength = await getFileLength(form);
+
+        console.log(`[${id}] شروع ارسال فایل به ایتایار`);
+
+        response = await axios.post(
+          `${baseUrl}/sendFile`,
+          form,
           {
-            filename: req.file.originalname || 'upload.bin',
-            contentType: req.file.mimetype,
-            knownLength: req.file.size
+            headers: {
+              ...form.getHeaders(),
+              'Content-Length': contentLength
+            },
+            timeout: 90000,
+            maxBodyLength: 15 * 1024 * 1024,
+            maxContentLength: 15 * 1024 * 1024,
+            maxRedirects: 5,
+            validateStatus: () => true
           }
         );
 
-        response = await axios.post(url, form, {
-          headers: form.getHeaders(),
-          timeout: 30000,
-          maxBodyLength: 12 * 1024 * 1024,
-          maxContentLength: 12 * 1024 * 1024,
-          validateStatus: () => true
-        });
-
       } else {
+        console.log(`[${id}] ارسال پیام متنی`);
+
         const params = new URLSearchParams();
         params.append('chat_id', channels[admin]);
         params.append('text', caption);
 
-        response = await axios.post(url, params.toString(), {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          timeout: 30000,
-          validateStatus: () => true
-        });
+        response = await axios.post(
+          `${baseUrl}/sendMessage`,
+          params.toString(),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            timeout: 60000,
+            validateStatus: () => true
+          }
+        );
       }
 
-      console.log(`[${id}] پاسخ HTTP ایتایار: ${response.status}`);
+      console.log(`[${id}] HTTP: ${response.status}`);
+
       console.log(
-        `[${id}] پاسخ API:`,
-        JSON.stringify(response.data).slice(0, 1200)
+        `[${id}] پاسخ ایتایار:`,
+        JSON.stringify(response.data).slice(0, 2000)
       );
 
       if (
@@ -202,7 +239,7 @@ app.post('/send', sendLimiter, (req, res) => {
       ) {
         return res.status(502).json({
           ok: false,
-          message: 'ایتایار ارسال را نپذیرفت. پاسخ API در Logs ثبت شده است.'
+          message: 'ایتایار ارسال را نپذیرفت. لاگ Render را بررسی کن.'
         });
       }
 
@@ -217,14 +254,14 @@ app.post('/send', sendLimiter, (req, res) => {
 
     } catch (error) {
       console.error(
-        `[${id}] خطای Axios:`,
+        `[${id}] خطای ارسال:`,
         error.code || error.name,
         error.message
       );
 
       if (error.response) {
         console.error(
-          `[${id}] پاسخ خطای ایتایار:`,
+          `[${id}] پاسخ خطا:`,
           error.response.status,
           error.response.data
         );
@@ -237,8 +274,8 @@ app.post('/send', sendLimiter, (req, res) => {
       return res.status(timeout ? 504 : 502).json({
         ok: false,
         message: timeout
-          ? 'زمان پاسخ ایتایار تمام شد.'
-          : 'ارتباط با ایتایار برقرار نشد. لاگ سرور را بررسی کن.'
+          ? 'زمان انتظار ارسال تمام شد.'
+          : 'خطا در ارتباط با ایتایار. لاگ Render را بررسی کن.'
       });
     }
   });
