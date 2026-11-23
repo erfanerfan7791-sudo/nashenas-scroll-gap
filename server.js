@@ -4,6 +4,8 @@ const helmet = require('helmet');
 const multer = require('multer');
 const { rateLimit } = require('express-rate-limit');
 const { randomUUID } = require('node:crypto');
+const axios = require('axios');
+const FormData = require('form-data');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,14 +27,13 @@ const channels = {
   'خلخالی': '11302069'
 };
 
-// محدودیت فایل: ۱۰ مگابایت
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024,
     files: 1
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     const allowed =
       file.mimetype.startsWith('image/') ||
       file.mimetype.startsWith('video/') ||
@@ -40,7 +41,7 @@ const upload = multer({
       file.mimetype === 'application/pdf';
 
     if (!allowed) {
-      return cb(new Error('فرمت فایل مجاز نیست.'));
+      return cb(new Error('فقط عکس، ویدیو، صوت و PDF مجاز است.'));
     }
 
     cb(null, true);
@@ -54,39 +55,26 @@ const sendLimiter = rateLimit({
   legacyHeaders: false,
   message: {
     ok: false,
-    message: 'تعداد ارسال‌ها زیاد است. کمی بعد تلاش کن.'
+    message: 'تعداد ارسال‌ها زیاد است. کمی بعد دوباره تلاش کن.'
   }
 });
 
-// بررسی سلامت سرور
-app.get('/health', (req, res) => {
-  res.json({
-    ok: true,
-    service: 'Nashenas Scroll Gap'
-  });
+app.get('/health', (_req, res) => {
+  res.json({ ok: true });
 });
 
-// ثبت شروع درخواست
-app.use('/send', (req, res, next) => {
+app.use('/send', (req, _res, next) => {
   req.requestId = randomUUID().slice(0, 8);
   console.log(`[${req.requestId}] درخواست جدید دریافت شد`);
   next();
 });
 
-// ارسال پیام و فایل
 app.post('/send', sendLimiter, (req, res) => {
   const id = req.requestId;
 
-  console.log(`[${id}] شروع دریافت اطلاعات`);
-
-  // دریافت فایل با مدیریت خطای مستقل
   upload.single('file')(req, res, async (uploadError) => {
-
     if (uploadError) {
-      console.error(
-        `[${id}] خطای دریافت فایل:`,
-        uploadError.message
-      );
+      console.error(`[${id}] خطای دریافت فایل:`, uploadError.message);
 
       if (
         uploadError instanceof multer.MulterError &&
@@ -104,23 +92,16 @@ app.post('/send', sendLimiter, (req, res) => {
       });
     }
 
-    console.log(`[${id}] دریافت اطلاعات تمام شد`);
-
     try {
+      console.log(`[${id}] اطلاعات فرم دریافت شد`);
+
       const admin = req.body?.admin;
+      const message = typeof req.body?.message === 'string'
+        ? req.body.message.trim()
+        : '';
 
-      const message =
-        typeof req.body?.message === 'string'
-          ? req.body.message.trim()
-          : '';
-
-      const website = req.body?.website;
-
-      if (website) {
-        return res.json({
-          ok: true,
-          message: 'پیام دریافت شد.'
-        });
+      if (req.body?.website) {
+        return res.json({ ok: true, message: 'پیام دریافت شد.' });
       }
 
       if (!Object.prototype.hasOwnProperty.call(channels, admin)) {
@@ -140,27 +121,17 @@ app.post('/send', sendLimiter, (req, res) => {
       if (message.length > 2000) {
         return res.status(400).json({
           ok: false,
-          message: 'متن پیام بیشتر از ۲۰۰۰ نویسه است.'
+          message: 'متن پیام نباید بیشتر از ۲۰۰۰ نویسه باشد.'
         });
       }
 
       if (!TOKEN) {
-        console.error(`[${id}] توکن ایتایار تنظیم نشده است`);
+        console.error(`[${id}] EITAAYAR_TOKEN تنظیم نشده است`);
 
         return res.status(503).json({
           ok: false,
           message: 'اتصال ایتایار تنظیم نشده است.'
         });
-      }
-
-      if (req.file) {
-        console.log(
-          `[${id}] فایل دریافت شد: ${req.file.originalname}`
-        );
-
-        console.log(
-          `[${id}] حجم فایل: ${req.file.size} bytes`
-        );
       }
 
       const caption =
@@ -170,87 +141,68 @@ app.post('/send', sendLimiter, (req, res) => {
         `#ناشناس_${admin}`;
 
       const method = req.file ? 'sendFile' : 'sendMessage';
+      const url = `https://eitaayar.ir/api/${TOKEN}/${method}`;
 
-      const url =
-        `https://eitaayar.ir/api/${TOKEN}/${method}`;
-
-      console.log(
-        `[${id}] شروع ارتباط با ایتایار: ${method}`
-      );
+      console.log(`[${id}] شروع ارسال با Axios: ${method}`);
 
       let response;
 
       if (req.file) {
-        const formData = new FormData();
-
-        formData.append('chat_id', channels[admin]);
-        formData.append('caption', caption);
-
-        const blob = new Blob(
-          [req.file.buffer],
-          { type: req.file.mimetype }
+        console.log(
+          `[${id}] فایل: ${req.file.originalname} - ${req.file.size} bytes`
         );
 
-        formData.append(
+        const form = new FormData();
+
+        form.append('chat_id', channels[admin]);
+        form.append('caption', caption);
+
+        form.append(
           'file',
-          blob,
-          req.file.originalname || 'upload.bin'
+          req.file.buffer,
+          {
+            filename: req.file.originalname || 'upload.bin',
+            contentType: req.file.mimetype,
+            knownLength: req.file.size
+          }
         );
 
-        response = await fetch(url, {
-          method: 'POST',
-          body: formData,
-          signal: AbortSignal.timeout(30000)
+        response = await axios.post(url, form, {
+          headers: form.getHeaders(),
+          timeout: 30000,
+          maxBodyLength: 12 * 1024 * 1024,
+          maxContentLength: 12 * 1024 * 1024,
+          validateStatus: () => true
         });
 
       } else {
+        const params = new URLSearchParams();
+        params.append('chat_id', channels[admin]);
+        params.append('text', caption);
 
-        response = await fetch(url, {
-          method: 'POST',
+        response = await axios.post(url, params.toString(), {
           headers: {
-            'Content-Type':
-              'application/x-www-form-urlencoded'
+            'Content-Type': 'application/x-www-form-urlencoded'
           },
-          body: new URLSearchParams({
-            chat_id: channels[admin],
-            text: caption
-          }),
-          signal: AbortSignal.timeout(30000)
+          timeout: 30000,
+          validateStatus: () => true
         });
       }
 
+      console.log(`[${id}] پاسخ HTTP ایتایار: ${response.status}`);
       console.log(
-        `[${id}] پاسخ HTTP: ${response.status}`
+        `[${id}] پاسخ API:`,
+        JSON.stringify(response.data).slice(0, 1200)
       );
 
-      const raw = await response.text();
-
-      let result;
-
-      try {
-        result = JSON.parse(raw);
-      } catch {
-        console.error(
-          `[${id}] پاسخ غیر JSON ایتایار:`,
-          raw.slice(0, 500)
-        );
-
+      if (
+        response.status < 200 ||
+        response.status >= 300 ||
+        response.data?.ok !== true
+      ) {
         return res.status(502).json({
           ok: false,
-          message: 'پاسخ ایتایار قابل خواندن نیست.'
-        });
-      }
-
-      console.log(
-        `[${id}] نتیجه ایتایار:`,
-        JSON.stringify(result).slice(0, 1000)
-      );
-
-      if (!response.ok || result.ok !== true) {
-        return res.status(502).json({
-          ok: false,
-          message:
-            'ایتایار ارسال را نپذیرفت. دسترسی ربات و مقصد را بررسی کن.'
+          message: 'ایتایار ارسال را نپذیرفت. پاسخ API در Logs ثبت شده است.'
         });
       }
 
@@ -264,43 +216,34 @@ app.post('/send', sendLimiter, (req, res) => {
       });
 
     } catch (error) {
-
       console.error(
-        `[${id}] خطای سرور:`,
-        error.name,
+        `[${id}] خطای Axios:`,
+        error.code || error.name,
         error.message
       );
 
-      const isTimeout =
-        error.name === 'TimeoutError' ||
-        error.name === 'AbortError';
+      if (error.response) {
+        console.error(
+          `[${id}] پاسخ خطای ایتایار:`,
+          error.response.status,
+          error.response.data
+        );
+      }
 
-      return res.status(isTimeout ? 504 : 500).json({
+      const timeout =
+        error.code === 'ECONNABORTED' ||
+        error.code === 'ETIMEDOUT';
+
+      return res.status(timeout ? 504 : 502).json({
         ok: false,
-        message: isTimeout
-          ? 'ارتباط با ایتایار بیش از حد طول کشید.'
-          : 'خطای داخلی سرور هنگام ارسال.'
+        message: timeout
+          ? 'زمان پاسخ ایتایار تمام شد.'
+          : 'ارتباط با ایتایار برقرار نشد. لاگ سرور را بررسی کن.'
       });
     }
   });
 });
 
-// خطاهای عمومی
-app.use((err, req, res, next) => {
-  console.error('خطای عمومی:', err.message);
-
-  if (res.headersSent) {
-    return next(err);
-  }
-
-  res.status(500).json({
-    ok: false,
-    message: 'خطای داخلی سرور.'
-  });
-});
-
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(
-    `Nashenas Scroll Gap running on ${PORT}`
-  );
+  console.log(`Nashenas Scroll Gap running on ${PORT}`);
 });
