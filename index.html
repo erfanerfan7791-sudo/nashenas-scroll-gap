@@ -1,162 +1,186 @@
+
 <!doctype html>
 <html lang="fa" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101014">
-  <title>ناشناس اسکرول گپ</title>
-  <style>
-    *{box-sizing:border-box}
-    :root{color-scheme:dark}
-    body{margin:0;min-height:100vh;padding:28px 14px;background:radial-gradient(circle at 15% 5%,#24213a 0,transparent 34%),#101014;color:#f5f5f7;font-family:Tahoma,Arial,sans-serif;display:flex;align-items:center;justify-content:center}
-    .card{width:min(100%,520px);background:#19191f;border:1px solid #30303a;border-radius:24px;padding:25px;box-shadow:0 18px 55px #0008}
-    .brand{text-align:center;margin-bottom:24px}
-    .logo{width:58px;height:58px;border-radius:18px;margin:0 auto 12px;display:grid;place-items:center;background:linear-gradient(135deg,#8b5cf6,#4f46e5);font-size:27px;font-weight:bold}
-    h1{font-size:23px;margin:0 0 8px}
-    .sub{color:#a7a7b4;font-size:13px;line-height:1.9;margin:0}
-    label.title{display:block;font-size:14px;font-weight:bold;margin:19px 0 10px}
-    .admins{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
-    .admin{position:relative}
-    .admin input{position:absolute;opacity:0;pointer-events:none}
-    .admin span{display:block;text-align:center;padding:12px 7px;border:1px solid #393945;border-radius:12px;color:#d8d8e1;background:#22222a;cursor:pointer;transition:.2s;font-size:13px}
-    .admin input:checked+span{border-color:#9b82ff;background:#30264e;color:#fff;box-shadow:0 0 0 2px #8b5cf633}
-    textarea{width:100%;min-height:125px;resize:vertical;background:#111116;border:1px solid #393945;border-radius:13px;padding:14px;color:#fff;font:14px Tahoma,Arial,sans-serif;outline:none}
-    textarea:focus{border-color:#8b78ef}
-    .filebox{border:1px dashed #555365;border-radius:14px;padding:15px;background:#14141a}
-    .filebox input{width:100%;color:#c9c8d3;font:13px Tahoma,Arial,sans-serif}
-    .hint{font-size:11px;color:#9695a3;line-height:1.8;margin:9px 0 0}
-    #fileName{font-size:12px;color:#c8c2e5;margin-top:9px;overflow-wrap:anywhere}
-    button{width:100%;margin-top:20px;border:0;border-radius:13px;padding:15px;background:linear-gradient(110deg,#8b5cf6,#5b54df);color:white;font-size:15px;font-weight:bold;cursor:pointer}
-    button:disabled{opacity:.55;cursor:wait}
-    .status{display:none;margin-top:14px;padding:12px;border-radius:12px;font-size:13px;line-height:1.8}
-    .status.show{display:block}.status.ok{background:#123526;color:#9cf0bd}.status.err{background:#3b1c25;color:#ffb8c5}
-    footer{text-align:center;color:#777684;font-size:11px;margin-top:19px}
-    @media(max-width:390px){.card{padding:19px}.admins{grid-template-columns:repeat(2,1fr)}}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101014">
+<title>ناشناس اسکرول گپ</title>
+<style>
+*{box-sizing:border-box}
+:root{color-scheme:dark}
+body{margin:0;min-height:100vh;padding:28px 14px;background:radial-gradient(circle at 15% 5%,#24213a 0,transparent 34%),#101014;color:#f5f5f7;font-family:Tahoma,Arial,sans-serif;display:flex;align-items:center;justify-content:center}
+.card{width:min(100%,520px);background:#19191f;border:1px solid #30303a;border-radius:24px;padding:25px;box-shadow:0 18px 55px #0008}
+.brand{text-align:center;margin-bottom:24px}
+.logo{width:58px;height:58px;border-radius:18px;margin:0 auto 12px;display:grid;place-items:center;background:linear-gradient(135deg,#8b5cf6,#4f46e5);font-size:27px;font-weight:bold}
+h1{font-size:23px;margin:0 0 8px}
+.sub{color:#a7a7b4;font-size:13px;line-height:1.9;margin:0}
+label.title{display:block;font-size:14px;font-weight:bold;margin:19px 0 10px}
+.admins{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.admin{position:relative}
+.admin input{position:absolute;opacity:0;pointer-events:none}
+.admin span{display:block;text-align:center;padding:12px 7px;border:1px solid #393945;border-radius:12px;color:#d8d8e1;background:#22222a;cursor:pointer;transition:.2s;font-size:13px}
+.admin input:checked+span{border-color:#9b82ff;background:#30264e;color:#fff;box-shadow:0 0 0 2px #8b5cf633}
+textarea{width:100%;min-height:125px;resize:vertical;background:#111116;border:1px solid #393945;border-radius:13px;padding:14px;color:#fff;font:14px Tahoma,Arial,sans-serif;outline:none}
+textarea:focus{border-color:#8b78ef}
+.filebox{border:1px dashed #555365;border-radius:14px;padding:15px;background:#14141a}
+.filebox input{width:100%;color:#c9c8d3;font:13px Tahoma,Arial,sans-serif}
+.hint{font-size:11px;color:#9695a3;line-height:1.8;margin:9px 0 0}
+#fileName{font-size:12px;color:#c8c2e5;margin-top:9px;overflow-wrap:anywhere}
+button{width:100%;margin-top:20px;border:0;border-radius:13px;padding:15px;background:linear-gradient(110deg,#8b5cf6,#5b54df);color:white;font-size:15px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.55;cursor:wait}
+.status{display:none;margin-top:14px;padding:12px;border-radius:12px;font-size:13px;line-height:1.8}
+.status.show{display:block}
+.status.ok{background:#123526;color:#9cf0bd}
+.status.err{background:#3b1c25;color:#ffb8c5}
+footer{text-align:center;color:#777684;font-size:11px;margin-top:19px}
+@media(max-width:390px){.card{padding:19px}.admins{grid-template-columns:repeat(2,1fr)}}
+</style>
 </head>
 <body>
-  <main class="card">
-    <header class="brand">
-      <div class="logo">S</div>
-      <h1>ناشناس اسکرول گپ</h1>
-      <p class="sub">پیامت رو بدون نمایش هویتت برای یکی از ادمین‌ها بفرست.</p>
-    </header>
+<main class="card">
+<header class="brand">
+<div class="logo">S</div>
+<h1>ناشناس اسکرول گپ</h1>
+<p class="sub">پیامت رو بدون نمایش هویتت برای یکی از ادمین‌ها بفرست.</p>
+</header>
 
-    <form id="form">
-      <label class="title">گیرنده پیام رو انتخاب کن</label>
-      <div class="admins">
-        <label class="admin"><input type="radio" name="admin" value="عرفان"><span>عرفان</span></label>
-        <label class="admin"><input type="radio" name="admin" value="سجاد"><span>سجاد</span></label>
-        <label class="admin"><input type="radio" name="admin" value="حاجی"><span>حاجی</span></label>
-        <label class="admin"><input type="radio" name="admin" value="رقیه"><span>رقیه</span></label>
-        <label class="admin"><input type="radio" name="admin" value="مارال"><span>مارال</span></label>
-        <label class="admin"><input type="radio" name="admin" value="معین"><span>معین</span></label>
-        <label class="admin"><input type="radio" name="admin" value="علی"><span>علی</span></label>
-        <label class="admin"><input type="radio" name="admin" value="امیر"><span>امیر</span></label>
-        <label class="admin"><input type="radio" name="admin" value="خلخالی"><span>خلخالی</span></label>
-      </div>
+<form id="form">
+<label class="title">گیرنده پیام رو انتخاب کن</label>
+<div class="admins">
+<label class="admin"><input type="radio" name="admin" value="عرفان"><span>عرفان</span></label>
+<label class="admin"><input type="radio" name="admin" value="سجاد"><span>سجاد</span></label>
+<label class="admin"><input type="radio" name="admin" value="حاجی"><span>حاجی</span></label>
+<label class="admin"><input type="radio" name="admin" value="رقیه"><span>رقیه</span></label>
+<label class="admin"><input type="radio" name="admin" value="مارال"><span>مارال</span></label>
+<label class="admin"><input type="radio" name="admin" value="معین"><span>معین</span></label>
+<label class="admin"><input type="radio" name="admin" value="علی"><span>علی</span></label>
+<label class="admin"><input type="radio" name="admin" value="امیر"><span>امیر</span></label>
+<label class="admin"><input type="radio" name="admin" value="خلخالی"><span>خلخالی</span></label>
+</div>
 
-      <label class="title" for="message">متن پیام</label>
-      <textarea id="message" name="message" maxlength="2000" placeholder="پیامت رو اینجا بنویس..."></textarea>
+<label class="title" for="message">متن پیام</label>
+<textarea id="message" name="message" maxlength="2000" placeholder="پیامت رو اینجا بنویس..."></textarea>
 
-      <label class="title" for="file">پیوست فایل (اختیاری)</label>
-      <div class="filebox">
-        <input id="file" name="file" type="file" accept="image/*,video/*,audio/*,application/pdf">
-        <div id="fileName">هنوز فایلی انتخاب نکردی</div>
-        <p class="hint">فرمت‌های مجاز: عکس، ویدیو، صوت و PDF — حداکثر ۱۰ مگابایت</p>
-      </div>
+<label class="title" for="file">پیوست فایل (اختیاری)</label>
+<div class="filebox">
+<input id="file" name="file" type="file" accept="image/*,video/*,audio/*,application/pdf">
+<div id="fileName">هنوز فایلی انتخاب نکردی</div>
+<p class="hint">فرمت‌های مجاز: عکس، ویدیو، صوت و PDF — حداکثر ۱۰ مگابایت</p>
+</div>
 
-      <div style="position:absolute;right:-10000px" aria-hidden="true">
-        <label for="website">وب‌سایت</label>
-        <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
-      </div>
+<div style="position:absolute;right:-10000px" aria-hidden="true">
+<label for="website">وب‌سایت</label>
+<input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
+</div>
 
-      <button id="submit" type="submit">ارسال پیام ناشناس</button>
-      <div id="status" class="status" role="status" aria-live="polite"></div>
-    </form>
-    <footer>ناشناس اسکرول گپ · لطفاً از ارسال محتوای آزاردهنده خودداری کن.</footer>
-  </main>
+<button id="submit" type="submit">ارسال پیام ناشناس</button>
+<div id="status" class="status" role="status" aria-live="polite"></div>
+</form>
 
-  <script>
-    const form = document.getElementById('form');
-    const btn = document.getElementById('submit');
-    const statusBox = document.getElementById('status');
-    const fileInput = document.getElementById('file');
-    const fileName = document.getElementById('fileName');
-    const messageInput = document.getElementById('message');
-    let sending = false;
+<footer>ناشناس اسکرول گپ · لطفاً از ارسال محتوای آزاردهنده خودداری کن.</footer>
+</main>
 
-    function show(text, type) {
-      statusBox.textContent = text;
-      statusBox.className = 'status show ' + type;
+<script>
+const API_URL = 'https://nashenas-scroll-gap-10.onrender.com/send';
+
+const form = document.getElementById('form');
+const btn = document.getElementById('submit');
+const statusBox = document.getElementById('status');
+const fileInput = document.getElementById('file');
+const fileName = document.getElementById('fileName');
+const messageInput = document.getElementById('message');
+
+let sending = false;
+
+function show(text,type){
+  statusBox.textContent = text;
+  statusBox.className = 'status show ' + type;
+}
+
+fileInput.addEventListener('change',()=>{
+  const file = fileInput.files[0];
+
+  if(!file){
+    fileName.textContent = 'هنوز فایلی انتخاب نکردی';
+    return;
+  }
+
+  if(file.size > 10 * 1024 * 1024){
+    fileInput.value = '';
+    fileName.textContent = 'هنوز فایلی انتخاب نکردی';
+    show('حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.','err');
+    return;
+  }
+
+  fileName.textContent = '📎 ' + file.name + ' (' +
+    (file.size / 1024 / 1024).toFixed(2) + ' مگابایت)';
+  statusBox.className = 'status';
+});
+
+form.addEventListener('submit',async(e)=>{
+  e.preventDefault();
+
+  if(sending) return;
+
+  const admin = form.querySelector('input[name="admin"]:checked');
+  const message = messageInput.value.trim();
+  const file = fileInput.files[0];
+
+  if(!admin) return show('اول یک گیرنده انتخاب کن.','err');
+  if(!message && !file) return show('متن پیام یا یک فایل انتخاب کن.','err');
+  if(message.length > 2000) return show('متن پیام بیش از حد طولانی است.','err');
+  if(file && file.size > 10 * 1024 * 1024)
+    return show('حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.','err');
+
+  sending = true;
+  btn.disabled = true;
+  btn.textContent = 'در حال ارسال...';
+  statusBox.className = 'status';
+
+  const data = new FormData(form);
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(),90000);
+
+  try{
+    const response = await fetch(API_URL,{
+      method:'POST',
+      body:data,
+      signal:controller.signal
+    });
+
+    const raw = await response.text();
+    let result;
+
+    try{
+      result = JSON.parse(raw);
+    }catch{
+      throw new Error('پاسخ سرور قابل خواندن نیست. کد: ' + response.status);
     }
 
-    fileInput.addEventListener('change', () => {
-      const file = fileInput.files[0];
-      if (!file) {
-        fileName.textContent = 'هنوز فایلی انتخاب نکردی';
-        return;
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        fileInput.value = '';
-        fileName.textContent = 'هنوز فایلی انتخاب نکردی';
-        show('حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.', 'err');
-        return;
-      }
-      fileName.textContent = '📎 ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' مگابایت)';
-      statusBox.className = 'status';
-    });
+    if(!response.ok || !result.ok){
+      throw new Error(result.message || 'ارسال انجام نشد. کد: ' + response.status);
+    }
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      if (sending) return;
+    show(result.message || 'پیام با موفقیت ارسال شد ❤️','ok');
+    form.reset();
+    fileName.textContent = 'هنوز فایلی انتخاب نکردی';
 
-      const admin = form.querySelector('input[name="admin"]:checked');
-      const message = messageInput.value.trim();
-      const file = fileInput.files[0];
-
-      if (!admin) return show('اول یک گیرنده انتخاب کن.', 'err');
-      if (!message && !file) return show('متن پیام یا یک فایل انتخاب کن.', 'err');
-      if (message.length > 2000) return show('متن پیام نباید بیشتر از ۲۰۰۰ نویسه باشد.', 'err');
-      if (file && file.size > 10 * 1024 * 1024) return show('حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.', 'err');
-
-      sending = true;
-      btn.disabled = true;
-      btn.textContent = 'در حال ارسال...';
-      statusBox.className = 'status';
-
-      try {
-        const data = new FormData(form);
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 75000);
-        let response;
-        try {
-          response = await fetch('/send', { method: 'POST', body: data, signal: controller.signal });
-        } finally {
-          clearTimeout(timer);
-        }
-
-        const raw = await response.text();
-        let result;
-        try { result = JSON.parse(raw); }
-        catch { throw new Error('پاسخ سرور قابل خواندن نیست (کد ' + response.status + ').'); }
-
-        if (!response.ok || !result.ok) throw new Error(result.message || 'ارسال انجام نشد.');
-        show(result.message || 'پیام با موفقیت ارسال شد ❤️', 'ok');
-        form.reset();
-        fileName.textContent = 'هنوز فایلی انتخاب نکردی';
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          show('زمان انتظار تمام شد. سرور یا سرویس ارسال فایل پاسخ نداده است؛ دوباره پشت سر هم تلاش نکن.', 'err');
-        } else {
-          show(err.message || 'ارتباط با سرور برقرار نشد.', 'err');
-        }
-      } finally {
-        sending = false;
-        btn.disabled = false;
-        btn.textContent = 'ارسال پیام ناشناس';
-      }
-    });
-  </script>
+  }catch(err){
+    if(err.name === 'AbortError'){
+      show('زمان انتظار تمام شد. لطفاً وضعیت سرور را بررسی کن.','err');
+    }else if(err instanceof TypeError){
+      show('ارتباط با سرور برقرار نشد. ممکن است مشکل اتصال یا دسترسی مرورگر باشد.','err');
+    }else{
+      show(err.message || 'خطای ناشناخته در ارسال.','err');
+    }
+  }finally{
+    clearTimeout(timer);
+    sending = false;
+    btn.disabled = false;
+    btn.textContent = 'ارسال پیام ناشناس';
+  }
+});
+</script>
 </body>
 </html>
