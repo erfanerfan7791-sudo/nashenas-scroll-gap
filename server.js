@@ -1,3 +1,4 @@
+
 const express = require('express');
 const helmet = require('helmet');
 const multer = require('multer');
@@ -24,17 +25,24 @@ const channels = {
   'خلخالی': '11302069'
 };
 
+// محدودیت فایل: ۱۰ مگابایت
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
-  fileFilter: (_req, file, cb) => {
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+    files: 1
+  },
+  fileFilter: (req, file, cb) => {
     const allowed =
       file.mimetype.startsWith('image/') ||
       file.mimetype.startsWith('video/') ||
       file.mimetype.startsWith('audio/') ||
       file.mimetype === 'application/pdf';
 
-    if (!allowed) return cb(new Error('فقط عکس، ویدیو، صوت و PDF مجاز است.'));
+    if (!allowed) {
+      return cb(new Error('فرمت فایل مجاز نیست.'));
+    }
+
     cb(null, true);
   }
 });
@@ -44,125 +52,255 @@ const sendLimiter = rateLimit({
   limit: 8,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  message: { ok: false, message: 'تعداد ارسال‌ها زیاد است. چند دقیقه بعد دوباره تلاش کن.' }
+  message: {
+    ok: false,
+    message: 'تعداد ارسال‌ها زیاد است. کمی بعد تلاش کن.'
+  }
 });
 
-app.get('/health', (_req, res) => res.json({ ok: true }));
+// بررسی سلامت سرور
+app.get('/health', (req, res) => {
+  res.json({
+    ok: true,
+    service: 'Nashenas Scroll Gap'
+  });
+});
 
-// این میان‌افزار قبل از Multer است تا شروع هر درخواست در لاگ ثبت شود.
-app.use('/send', (req, _res, next) => {
+// ثبت شروع درخواست
+app.use('/send', (req, res, next) => {
   req.requestId = randomUUID().slice(0, 8);
   console.log(`[${req.requestId}] درخواست جدید دریافت شد`);
   next();
 });
 
-app.post('/send', sendLimiter, upload.single('file'), async (req, res) => {
-  const id = req.requestId || 'no-id';
+// ارسال پیام و فایل
+app.post('/send', sendLimiter, (req, res) => {
+  const id = req.requestId;
 
-  try {
-    const admin = req.body?.admin;
-    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
-    const website = req.body?.website;
+  console.log(`[${id}] شروع دریافت اطلاعات`);
 
-    if (req.file) {
-      console.log(`[${id}] فایل دریافت شد: ${req.file.mimetype}, ${req.file.size} bytes`);
-    } else {
-      console.log(`[${id}] درخواست بدون فایل دریافت شد`);
-    }
+  // دریافت فایل با مدیریت خطای مستقل
+  upload.single('file')(req, res, async (uploadError) => {
 
-    // فیلد تله ضدربات؛ پر بودن آن یعنی درخواست رباتی است.
-    if (website) return res.json({ ok: true, message: 'پیام دریافت شد.' });
+    if (uploadError) {
+      console.error(
+        `[${id}] خطای دریافت فایل:`,
+        uploadError.message
+      );
 
-    if (!Object.prototype.hasOwnProperty.call(channels, admin)) {
-      return res.status(400).json({ ok: false, message: 'گیرنده انتخاب‌شده معتبر نیست.' });
-    }
+      if (
+        uploadError instanceof multer.MulterError &&
+        uploadError.code === 'LIMIT_FILE_SIZE'
+      ) {
+        return res.status(413).json({
+          ok: false,
+          message: 'حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.'
+        });
+      }
 
-    if (message.length > 2000) {
-      return res.status(400).json({ ok: false, message: 'متن پیام نباید بیشتر از ۲۰۰۰ نویسه باشد.' });
-    }
-
-    if (!message && !req.file) {
-      return res.status(400).json({ ok: false, message: 'متن پیام یا یک فایل انتخاب کن.' });
-    }
-
-    if (!TOKEN) {
-      console.error(`[${id}] متغیر EITAAYAR_TOKEN در Render تنظیم نشده است.`);
-      return res.status(503).json({ ok: false, message: 'اتصال ایتایار روی سرور تنظیم نشده است.' });
-    }
-
-    const caption =
-      `📩 پیام ناشناس جدید\n` +
-      `👤 گیرنده: ${admin}\n\n` +
-      `${message ? message + '\n\n' : ''}` +
-      `#ناشناس_${admin}`;
-
-    const url = `https://eitaayar.ir/api/${TOKEN}/${req.file ? 'sendFile' : 'sendMessage'}`;
-    let apiResponse;
-
-    console.log(`[${id}] شروع ارسال به ایتایار؛ نوع: ${req.file ? 'file' : 'text'}`);
-
-    if (req.file) {
-      const form = new FormData();
-      form.append('chat_id', channels[admin]);
-      form.append('caption', caption);
-      const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
-      form.append('file', blob, req.file.originalname || 'upload.bin');
-
-      apiResponse = await fetch(url, {
-        method: 'POST',
-        body: form,
-        signal: AbortSignal.timeout(60000)
-      });
-    } else {
-      apiResponse = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ chat_id: channels[admin], text: caption }),
-        signal: AbortSignal.timeout(60000)
-      });
-    }
-
-    const raw = await apiResponse.text();
-    let result;
-    try { result = JSON.parse(raw); }
-    catch { result = { ok: false, description: raw.slice(0, 500) }; }
-
-    console.log(`[${id}] پاسخ HTTP ایتایار: ${apiResponse.status}`);
-    console.log(`[${id}] نتیجه ایتایار: ${JSON.stringify(result).slice(0, 1200)}`);
-
-    if (!apiResponse.ok || result.ok !== true) {
-      return res.status(502).json({
+      return res.status(400).json({
         ok: false,
-        message: 'ایتایار فایل یا پیام را نپذیرفت. دسترسی ربات به گیرنده و تنظیمات ایتایار را بررسی کن.'
+        message: uploadError.message || 'خطا در دریافت فایل.'
       });
     }
 
-    console.log(`[${id}] ارسال موفق بود`);
-    return res.json({
-      ok: true,
-      message: req.file
-        ? `فایل و پیام با موفقیت برای ${admin} ارسال شدند ❤️`
-        : `پیامت با موفقیت برای ${admin} ارسال شد ❤️`
-    });
-  } catch (err) {
-    console.error(`[${id}] خطای ارسال: ${err.name || 'Error'} - ${err.message}`);
-    const timeout = err.name === 'TimeoutError' || err.name === 'AbortError';
-    return res.status(timeout ? 504 : 500).json({
-      ok: false,
-      message: timeout ? 'پاسخ ایتایار در زمان مناسب نرسید. کمی بعد دوباره تلاش کن.' : 'خطای موقت سرور هنگام ارسال. لاگ Render را بررسی کن.'
-    });
-  }
+    console.log(`[${id}] دریافت اطلاعات تمام شد`);
+
+    try {
+      const admin = req.body?.admin;
+
+      const message =
+        typeof req.body?.message === 'string'
+          ? req.body.message.trim()
+          : '';
+
+      const website = req.body?.website;
+
+      if (website) {
+        return res.json({
+          ok: true,
+          message: 'پیام دریافت شد.'
+        });
+      }
+
+      if (!Object.prototype.hasOwnProperty.call(channels, admin)) {
+        return res.status(400).json({
+          ok: false,
+          message: 'گیرنده انتخاب‌شده معتبر نیست.'
+        });
+      }
+
+      if (!message && !req.file) {
+        return res.status(400).json({
+          ok: false,
+          message: 'متن پیام یا فایل انتخاب کن.'
+        });
+      }
+
+      if (message.length > 2000) {
+        return res.status(400).json({
+          ok: false,
+          message: 'متن پیام بیشتر از ۲۰۰۰ نویسه است.'
+        });
+      }
+
+      if (!TOKEN) {
+        console.error(`[${id}] توکن ایتایار تنظیم نشده است`);
+
+        return res.status(503).json({
+          ok: false,
+          message: 'اتصال ایتایار تنظیم نشده است.'
+        });
+      }
+
+      if (req.file) {
+        console.log(
+          `[${id}] فایل دریافت شد: ${req.file.originalname}`
+        );
+
+        console.log(
+          `[${id}] حجم فایل: ${req.file.size} bytes`
+        );
+      }
+
+      const caption =
+        `📩 پیام ناشناس جدید\n` +
+        `👤 گیرنده: ${admin}\n\n` +
+        `${message ? message + '\n\n' : ''}` +
+        `#ناشناس_${admin}`;
+
+      const method = req.file ? 'sendFile' : 'sendMessage';
+
+      const url =
+        `https://eitaayar.ir/api/${TOKEN}/${method}`;
+
+      console.log(
+        `[${id}] شروع ارتباط با ایتایار: ${method}`
+      );
+
+      let response;
+
+      if (req.file) {
+        const formData = new FormData();
+
+        formData.append('chat_id', channels[admin]);
+        formData.append('caption', caption);
+
+        const blob = new Blob(
+          [req.file.buffer],
+          { type: req.file.mimetype }
+        );
+
+        formData.append(
+          'file',
+          blob,
+          req.file.originalname || 'upload.bin'
+        );
+
+        response = await fetch(url, {
+          method: 'POST',
+          body: formData,
+          signal: AbortSignal.timeout(30000)
+        });
+
+      } else {
+
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            chat_id: channels[admin],
+            text: caption
+          }),
+          signal: AbortSignal.timeout(30000)
+        });
+      }
+
+      console.log(
+        `[${id}] پاسخ HTTP: ${response.status}`
+      );
+
+      const raw = await response.text();
+
+      let result;
+
+      try {
+        result = JSON.parse(raw);
+      } catch {
+        console.error(
+          `[${id}] پاسخ غیر JSON ایتایار:`,
+          raw.slice(0, 500)
+        );
+
+        return res.status(502).json({
+          ok: false,
+          message: 'پاسخ ایتایار قابل خواندن نیست.'
+        });
+      }
+
+      console.log(
+        `[${id}] نتیجه ایتایار:`,
+        JSON.stringify(result).slice(0, 1000)
+      );
+
+      if (!response.ok || result.ok !== true) {
+        return res.status(502).json({
+          ok: false,
+          message:
+            'ایتایار ارسال را نپذیرفت. دسترسی ربات و مقصد را بررسی کن.'
+        });
+      }
+
+      console.log(`[${id}] ارسال موفق بود`);
+
+      return res.json({
+        ok: true,
+        message: req.file
+          ? `فایل با موفقیت برای ${admin} ارسال شد ❤️`
+          : `پیامت با موفقیت برای ${admin} ارسال شد ❤️`
+      });
+
+    } catch (error) {
+
+      console.error(
+        `[${id}] خطای سرور:`,
+        error.name,
+        error.message
+      );
+
+      const isTimeout =
+        error.name === 'TimeoutError' ||
+        error.name === 'AbortError';
+
+      return res.status(isTimeout ? 504 : 500).json({
+        ok: false,
+        message: isTimeout
+          ? 'ارتباط با ایتایار بیش از حد طول کشید.'
+          : 'خطای داخلی سرور هنگام ارسال.'
+      });
+    }
+  });
 });
 
-// خطاهای Multer، از جمله حجم فایل، اینجا مدیریت می‌شوند.
-app.use((err, _req, res, _next) => {
-  console.error(`خطای دریافت فایل: ${err.message}`);
-  if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(413).json({ ok: false, message: 'حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.' });
+// خطاهای عمومی
+app.use((err, req, res, next) => {
+  console.error('خطای عمومی:', err.message);
+
+  if (res.headersSent) {
+    return next(err);
   }
-  return res.status(400).json({ ok: false, message: err.message || 'فایل قابل قبول نیست.' });
+
+  res.status(500).json({
+    ok: false,
+    message: 'خطای داخلی سرور.'
+  });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Nashenas Scroll Gap running on ${PORT}`);
+  console.log(
+    `Nashenas Scroll Gap running on ${PORT}`
+  );
 });
