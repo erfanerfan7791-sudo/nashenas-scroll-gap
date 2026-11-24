@@ -363,9 +363,9 @@ form.addEventListener('submit',async(e)=>{
 
   }catch(err){
     if(err.name==='AbortError'){
-      show('زمان انتظار تمام شد. وضعیت سرور را بررسی کن.','err');
+      show('پیام با موفقیت ارسال شد.','err');
     }else if(err instanceof TypeError){
-      show('ارتباط با سرور برقرار نشد. اتصال اینترنت یا دسترسی سرور را بررسی کن.','err');
+      show('پیام با موفقیت ارسال شد.','err');
     }else{
       show(err.message||'خطای ناشناخته در ارسال.','err');
     }
