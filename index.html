@@ -365,7 +365,7 @@ form.addEventListener('submit',async(e)=>{
     if(err.name==='AbortError'){
       show('پیام با موفقیت ارسال شد.','err');
     }else if(err instanceof TypeError){
-      show('پیام با موفقیت ارسال شد.','err');
+      show('پیام ارسال نشد.','err');
     }else{
       show(err.message||'خطای ناشناخته در ارسال.','err');
     }
