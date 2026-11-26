@@ -155,9 +155,9 @@ app.post('/send', sendLimiter, (req, res) => {
 
       const caption =
         `📩 پیام ناشناس جدید\n` +
-        `👤 گیرنده: ${admin}\n\n` +
+        `#ناشناس_${admin}`; 
         `${message ? message + '\n\n' : ''}` +
-        `#ناشناس_${admin}`;
+        
 
       const baseUrl = `https://eitaayar.ir/api/${TOKEN}`;
 
