@@ -153,11 +153,11 @@ app.post('/send', sendLimiter, (req, res) => {
         });
       }
 
+      // قالب پیام ناشناس
       const caption =
-        `📩 پیام ناشناس جدید\n` +
-        `#ناشناس_${admin}`; 
-        `${message ? message + '\n\n' : ''}` +
-        
+        `ناشناس جدید\n` +
+        `#ناشناس_${admin}\n\n` +
+        `${message || ''}`;
 
       const baseUrl = `https://eitaayar.ir/api/${TOKEN}`;
 
@@ -178,7 +178,6 @@ app.post('/send', sendLimiter, (req, res) => {
         form.append('chat_id', channels[admin]);
         form.append('caption', caption);
 
-        // نام فیلد فایل در API ایتایار
         form.append('file', req.file.buffer, {
           filename: safeName,
           contentType: req.file.mimetype,
