@@ -155,8 +155,8 @@ app.post('/send', sendLimiter, (req, res) => {
 
       // قالب پیام ناشناس
       const caption =
-        `ناشناس جدید\n` +
-        `#ناشناس_${admin}\n\n` +
+        `📩 پیام ناشناس جدید\n` +
+        `👤#ناشناس_${admin}\n\n` +
         `${message || ''}`;
 
       const baseUrl = `https://eitaayar.ir/api/${TOKEN}`;
